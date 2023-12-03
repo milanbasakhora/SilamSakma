@@ -19,6 +19,7 @@ class ProductImagesRelationManager extends RelationManager
         return $form
             ->schema([
                 Forms\Components\FileUpload::make('image')
+                ->multiple()
                     ->required(),
             ]);
     }

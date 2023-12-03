@@ -8,11 +8,13 @@ use App\Filament\Resources\ProductResource\RelationManagers\ProductImagesRelatio
 use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Str;
 
 class ProductResource extends Resource
 {
@@ -28,20 +30,45 @@ class ProductResource extends Resource
             ->schema([
                 Forms\Components\Select::make('category_id')
                     ->relationship('category', 'title')
-                    ->required()->columnSpan(3),
+                    ->required()
+                    ->columnSpan(3)
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('title')
+                            ->required()
+                            ->live(debounce: 1000)
+                            ->afterStateUpdated(fn (Set $set, ?string $state) => $set('slug', Str::slug($state)))
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('slug')
+                            ->required()
+                            ->maxLength(255),
+                    ]),
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255)->columnSpan(3),
-                    Forms\Components\TextInput::make('mp')
+                Forms\Components\TextInput::make('mp')
                     ->required()
-                    ->maxLength(255)->columnSpan(2),
+                    ->numeric()
+                    ->live(debounce: '1000')
+                    ->afterStateUpdated(fn (Set $set, ?int $state) => $set('sp', $state))
+                    ->maxLength(255)
+                    ->prefix('Rs')
+                    ->columnSpan(2),
+                Forms\Components\TextInput::make('discount')
+                    ->maxLength(255)
+                    ->afterStateUpdated(fn (Set $set, ?int $state, callable $get) => $set('sp', $get('mp') - ($get('mp') * $state / 100) ?? null))
+                    ->columnSpan(2)
+                    ->live(debounce: '1000')
+                    ->numeric()
+                    ->label('Discount Percentage')
+                    ->suffix('%'),
                 Forms\Components\TextInput::make('sp')
                     ->required()
-                    ->maxLength(255)->columnSpan(2),
-                Forms\Components\TextInput::make('discount')
-                    ->maxLength(255)->columnSpan(2),
+                    ->maxLength(255)
+                    ->readOnly()
+                    ->prefix('Rs')
+                    ->columnSpan(2),
                 Forms\Components\RichEditor::make('description')
-                ->columnSpanFull(),
+                    ->columnSpanFull(),
             ])->columns(6);
     }
 
@@ -54,14 +81,13 @@ class ProductResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('description')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('mp')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('sp')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('discount')
-                    ->searchable(),
+                    ->searchable()
+                    ->suffix('%'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
